@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>게토의 복습 캘린더</title>
+    <style>
+        :root { --primary: #6c5ce7; --bg: #f8f9fa; --review: #ff7675; --study: #55efc4; }
+        body { font-family: sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .card { background: white; width: 100%; max-width: 480px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); box-sizing: border-box; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+        .day-header { font-size: 12px; font-weight: bold; color: #aaa; padding-bottom: 10px; }
+        .date { padding: 12px 5px; cursor: pointer; border-radius: 8px; font-size: 14px; min-height: 55px; position: relative; transition: 0.2s; display: flex; flex-direction: column; align-items: center; }
+        .date:hover { background: #f0edff; }
+        .today { background: #eee; font-weight: bold; }
+        .selected { border: 2px solid var(--primary); }
+        
+        /* 일정 표시 점 및 원숭이 아이콘 */
+        .dot-container { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
+        .dot { width: 5px; height: 5px; border-radius: 50%; }
+        .dot.study { background: var(--study); }
+        .dot.review { background: var(--review); }
+        .monkey-icon { font-size: 16px; margin-top: 2px; animation: pop 0.3s ease; }
+        @keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; margin-top: 10px; box-sizing: border-box; }
+        .todo-item { display: flex; align-items: center; margin-top: 8px; padding: 10px; background: #fdfdfd; border-radius: 8px; border: 1px solid #f0f0f0; }
+        .todo-item.done { opacity: 0.5; text-decoration: line-through; }
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; margin-right: 8px; flex-shrink: 0; }
+        .delete-btn { margin-left: auto; background: none; border: none; color: #ff7675; cursor: pointer; font-size: 18px; padding: 0 5px; }
+
+        #geto-praise { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 4px solid var(--primary); padding: 20px; border-radius: 20px; z-index: 100; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.3); width: 280px; }
+        #geto-img { width: 100%; border-radius: 15px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div id="geto-praise">
+    <img src="geto1.PNG" id="geto-img">
+    <h3 id="praise-msg">"역시 대단하네."</h3>
+    <button onclick="document.getElementById('geto-praise').style.display='none'" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer; width:100%;">고마워!</button>
+</div>
+
+<div class="card">
+    <div class="header">
+        <button onclick="moveMonth(-1)">◀</button>
+        <h2 id="month-year"></h2>
+        <button onclick="moveMonth(1)">▶</button>
+    </div>
+    <div class="grid" id="calendar-grid">
+        <div class="day-header" style="color:#ff7675">일</div><div class="day-header">월</div><div class="day-header">화</div><div class="day-header">수</div><div class="day-header">목</div><div class="day-header">금</div><div class="day-header" style="color:#0984e3">토</div>
+    </div>
+    <div style="margin-top:20px; border-top:1px solid #eee; padding-top:20px;">
+        <h4 id="selected-date-text" style="margin:0 0 10px 0; font-size: 14px; color:#636e72;">날짜를 선택하세요</h4>
+        <input type="text" id="study-input" placeholder="공부 내용 입력 후 Enter" onkeypress="handleInput(event)">
+        <div id="todo-list" style="margin-top:15px;"></div>
+    </div>
+</div>
+
+<script>
+    let date = new Date();
+    let selectedDate = null;
+    let studyData = JSON.parse(localStorage.getItem('studyData')) || {};
+
+    function renderCalendar() {
+        const year = date.getFullYear(); const month = date.getMonth();
+        document.getElementById('month-year').innerText = `${year}년 ${month + 1}월`;
+        const grid = document.getElementById('calendar-grid');
+        document.querySelectorAll('.date').forEach(el => el.remove());
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+
+        for(let i=0; i<firstDay; i++) grid.appendChild(Object.assign(document.createElement('div'), {className:'date'}));
+        for(let i=1; i<=lastDate; i++) {
+            const dStr = `${year}-${month+1}-${i}`;
+            const el = document.createElement('div');
+            el.className = 'date'; el.innerText = i;
+            if(dStr === selectedDate) el.classList.add('selected');
+            if(i === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear()) el.classList.add('today');
+            
+            if(studyData[dStr] && studyData[dStr].length > 0) {
+                // 해당 날짜의 모든 일정이 완료되었는지 확인
+                const allDone = studyData[dStr].every(item => item.done);
+                
+                if (allDone) {
+                    // 모두 완료하면 원숭이 아이콘 표시
+                    const monkey = document.createElement('div');
+                    monkey.className = 'monkey-icon';
+                    monkey.innerText = '🐒';
+                    el.appendChild(monkey);
+                } else {
+                    // 미완료 일정이 있으면 점 표시
+                    const dots = document.createElement('div'); 
+                    dots.className = 'dot-container';
+                    studyData[dStr].forEach(item => { if(!item.done) {
+                        const dot = document.createElement('div'); dot.className = `dot ${item.type}`; dots.appendChild(dot);
+                    }});
+                    el.appendChild(dots);
+                }
+            }
+            el.onclick = () => { selectedDate = dStr; updateUI(); renderCalendar(); };
+            grid.appendChild(el);
+        }
+    }
+
+    function handleInput(e) {
+        if(e.key === 'Enter') {
+            const title = e.target.value.trim();
+            if(!selectedDate || !title) return;
+            const groupId = Date.now();
+            const schedules = [
+                { ms: 0, label: '신규', type: 'study' },
+                { ms: 20*60*1000, label: '20분 뒤', type: 'review' },
+                { ms: 60*60*1000, label: '1시간 뒤', type: 'review' },
+                { ms: 9*60*60*1000, label: '9시간 뒤', type: 'review' },
+                { ms: 24*60*60*1000, label: '1일 뒤', type: 'review' },
+                { ms: 3*24*60*60*1000, label: '3일 뒤', type: 'review' },
+                { ms: 7*24*60*60*1000, label: '7일 뒤', type: 'review' },
+                { ms: 30*24*60*60*1000, label: '30일 뒤', type: 'review' }
+            ];
+            const baseDate = new Date();
+            schedules.forEach(s => {
+                const tDate = new Date(baseDate.getTime() + s.ms);
+                const tStr = `${tDate.getFullYear()}-${tDate.getMonth()+1}-${tDate.getDate()}`;
+                if(!studyData[tStr]) studyData[tStr] = [];
+                studyData[tStr].push({ groupId, title, type: s.type, label: s.label, done: false });
+            });
+            saveAndRefresh();
+            e.target.value = "";
+        }
+    }
+
+    function deleteGroup(groupId) {
+        if(!confirm("이 공부와 관련된 모든 복습 일정을 삭제할까요?")) return;
+        for (let dateKey in studyData) {
+            studyData[dateKey] = studyData[dateKey].filter(item => item.groupId !== groupId);
+            if (studyData[dateKey].length === 0) delete studyData[dateKey];
+        }
+        saveAndRefresh();
+    }
+
+    function toggleDone(dateStr, index) {
+        studyData[dateStr][index].done = !studyData[dateStr][index].done;
+        if(studyData[dateStr][index].done) showPraise();
+        saveAndRefresh();
+    }
+
+    function saveAndRefresh() {
+        localStorage.setItem('studyData', JSON.stringify(studyData));
+        updateUI();
+        renderCalendar();
+    }
+
+    function showPraise() {
+        const praises = ["역시 대단하네.", "착하지, 주술사의 자질이야.", "완벽한 타이밍이야.", "훌륭해."];
+        const rIdx = Math.floor(Math.random() * 3) + 1;
+        document.getElementById('geto-img').src = `geto${rIdx}.PNG`; 
+        document.getElementById('praise-msg').innerText = `"${praises[Math.floor(Math.random()*praises.length)]}"`;
+        document.getElementById('geto-praise').style.display = 'block';
+    }
+
+    function updateUI() {
+        document.getElementById('selected-date-text').innerText = selectedDate || "날짜를 선택하세요";
+        const list = document.getElementById('todo-list'); list.innerHTML = "";
+        if(studyData[selectedDate]) {
+            studyData[selectedDate].forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = `todo-item ${item.done ? 'done' : ''}`;
+                div.innerHTML = `
+                    <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleDone('${selectedDate}', ${idx})">
+                    <span class="badge" style="background:${item.type==='study'?'#55efc4':'#ff7675'}">${item.label}</span>
+                    <span style="flex-grow:1">${item.title}</span>
+                    <button class="delete-btn" onclick="deleteGroup(${item.groupId})">×</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+    }
+
+    function moveMonth(n) { date.setMonth(date.getMonth()+n); renderCalendar(); }
+    renderCalendar();
+</script>
+</body>
+</html>

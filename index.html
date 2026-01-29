@@ -153,7 +153,14 @@
     }
 
     function showPraise() {
-        const praises = ["역시 대단하네.", "착하지, 주술사의 자질이야.", "완벽한 타이밍이야.", "훌륭해."];
+                const praises = [
+            "역시 대단하네, 원숭이가 아니었구나.",
+            "착하지, 복습은 주술사와 같은 자질이야.",
+            "이 정도로 노력한다면 내가 비술사를 죽일 필요도 없겠어.",
+            "완벽한 타이밍이야. 복습의 정수네.",
+            "너라면 나의 '대의'를 이해할 수 있을지도 모르겠군.",
+            "훌륭해. 이 힘을 세상을 바로잡는 데 쓰도록 해."
+        ];
         const rIdx = Math.floor(Math.random() * 3) + 1;
         document.getElementById('geto-img').src = `geto${rIdx}.PNG`; 
         document.getElementById('praise-msg').innerText = `"${praises[Math.floor(Math.random()*praises.length)]}"`;
@@ -182,4 +189,5 @@
     renderCalendar();
 </script>
 </body>
+
 </html>
